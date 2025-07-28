@@ -1,4 +1,4 @@
-//---------------//
+// CustomModal.tsx
 import React, { useEffect, useState, type JSX } from "react";
 import {
   Modal,
@@ -11,7 +11,18 @@ import {
   useBreakpointValue,
   useColorModeValue,
   Box,
+  Spinner,
+  Button,
 } from "@chakra-ui/react";
+import { BsFullscreen, BsFullscreenExit } from "react-icons/bs";
+
+// Define the type for variants
+const variantColors = {
+  info: "blue.400",
+  warning: "orange.400",
+  error: "red.500",
+  success: "green.500",
+};
 
 type CustomModalProps = {
   isOpen: boolean;
@@ -32,6 +43,15 @@ type CustomModalProps = {
   isResizable?: boolean;
   hideOverlay?: boolean;
   disableBodyScroll?: boolean;
+  disableEscClose?: boolean;
+  isDraggable?: boolean;
+  showFullscreenToggle?: boolean;
+  stickyHeader?: boolean;
+  stickyFooter?: boolean;
+  customCloseIcon?: React.ReactNode;
+  onBackdropClick?: () => void;
+  isLoading?: boolean;
+  variant?: keyof typeof variantColors;
 };
 
 export default function CustomModal({
@@ -53,17 +73,27 @@ export default function CustomModal({
   isResizable = false,
   hideOverlay = false,
   disableBodyScroll = false,
+  disableEscClose = false,
+  isDraggable = false,
+  showFullscreenToggle = false,
+  stickyHeader = false,
+  stickyFooter = false,
+  customCloseIcon,
+  onBackdropClick,
+  isLoading = false,
+  variant,
 }: CustomModalProps): JSX.Element {
   const overlayClickEnabled = isResizable ? false : closeOnOverlayClick;
-
   const isLargeScreen = useBreakpointValue({ base: false, lg: true }) ?? false;
   const initialWidth = width || "65vw";
   const [drawerWidth, setDrawerWidth] = useState(initialWidth);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const modalBg = backgroundColor || useColorModeValue("white", "gray.700");
-  
+  const headerColor = variant ? variantColors[variant] : "teal.400";
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape" && isOpen && !disableEscClose) {
         onClose();
       }
     };
@@ -71,34 +101,29 @@ export default function CustomModal({
     return () => {
       document.removeEventListener("keydown", handleEsc);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, disableEscClose]);
 
   useEffect(() => {
-  if (disableBodyScroll && isOpen) {
-    document.body.style.overflow = "hidden";
-  }
-  return () => {
-    if (disableBodyScroll) document.body.style.overflow = "";
-  };
-}, [isOpen, disableBodyScroll]);
+    if (disableBodyScroll && isOpen) {
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      if (disableBodyScroll) document.body.style.overflow = "";
+    };
+  }, [isOpen, disableBodyScroll]);
 
-  // 🔧 Resizable drawer handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isResizable) return; // 🔥 disable drag logic if not resizable
-
+    if (!isResizable) return;
     e.preventDefault();
     const startX = e.clientX;
-
     const drawerElement = document.querySelector(
       ".customScrollBar"
     ) as HTMLElement;
-    const startWidth = drawerElement
-      ? drawerElement.getBoundingClientRect().width
-      : parseInt(drawerWidth as string, 10);
+    const startWidth =
+      drawerElement?.getBoundingClientRect().width || parseInt(drawerWidth, 10);
 
     const convertVwToPx = (vw: string) =>
       window.innerWidth * (parseFloat(vw) / 100);
-
     const minWidthPx = initialWidth.endsWith("vw")
       ? convertVwToPx(initialWidth)
       : parseInt(initialWidth, 10);
@@ -106,15 +131,8 @@ export default function CustomModal({
     const doDrag = (dragEvent: MouseEvent) => {
       const deltaX = startX - dragEvent.clientX;
       let newWidth = startWidth + deltaX;
-
       const maxWidth = window.innerWidth - 100;
-
-      if (newWidth < minWidthPx) {
-        newWidth = minWidthPx;
-      } else if (newWidth > maxWidth) {
-        newWidth = maxWidth;
-      }
-
+      newWidth = Math.max(minWidthPx, Math.min(maxWidth, newWidth));
       setDrawerWidth(`${newWidth}px`);
     };
 
@@ -126,6 +144,28 @@ export default function CustomModal({
     document.addEventListener("mousemove", doDrag);
     document.addEventListener("mouseup", stopDrag);
   };
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    if (!isDraggable) return;
+    const modal = document.querySelector(".customScrollBar") as HTMLElement;
+    const offsetX = e.clientX - modal.getBoundingClientRect().left;
+    const offsetY = e.clientY - modal.getBoundingClientRect().top;
+
+    const move = (event: MouseEvent) => {
+      modal.style.top = `${event.clientY - offsetY}px`;
+      modal.style.left = `${event.clientX - offsetX}px`;
+      modal.style.position = "absolute";
+    };
+
+    const stop = () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", stop);
+    };
+
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", stop);
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -140,14 +180,15 @@ export default function CustomModal({
         <ModalOverlay
           bg="rgba(0, 0, 0, 0.4)"
           backdropFilter={`blur(${overlayBlur})`}
+          onClick={onBackdropClick}
         />
       )}
       <ModalContent
         position="fixed"
         right={isOpen ? "0" : `-${drawerWidth}`}
         top="0"
-        height="100vh"
-        width={isLargeScreen ? drawerWidth : "100vw"}
+        height={isFullScreen ? "100vh" : "100vh"}
+        width={isFullScreen ? "100vw" : isLargeScreen ? drawerWidth : "100vw"}
         overflow="auto"
         className="customScrollBar"
         animation={`${
@@ -158,7 +199,6 @@ export default function CustomModal({
         aria-label="custom modal"
         role="dialog"
       >
-        {/* 🔧 Resizer handle */}
         {isResizable && (
           <Box
             position="absolute"
@@ -173,22 +213,57 @@ export default function CustomModal({
           />
         )}
 
+        {showFullscreenToggle && (
+          <Button
+            size="sm"
+            onClick={() => setIsFullScreen((prev) => !prev)}
+            position="absolute"
+            top="4"
+            right="12"
+            zIndex="20"
+          >
+            {isFullScreen ? <BsFullscreenExit /> : <BsFullscreen />}
+          </Button>
+        )}
+
         {header && (
           <ModalHeader
             fontSize={{ base: "md", lg: "xl" }}
-            color="teal.400"
+            color={headerColor}
             fontWeight="700"
+            position={stickyHeader ? "sticky" : "relative"}
+            top="0"
+            zIndex="10"
+            bg={modalBg}
+            onMouseDown={handleDragStart}
+            style={{ cursor: isDraggable ? "move" : "default" }}
           >
             {header}
           </ModalHeader>
         )}
 
-        {!disableCloseButton && <ModalCloseButton />}
+        {!disableCloseButton && (
+          <Button>{customCloseIcon || undefined}</Button>
+        )}
 
-        <ModalBody p={padding}>{body}</ModalBody>
+        <ModalBody p={padding}>
+          {isLoading ? (
+            <Spinner size="lg" color="teal.500" thickness="4px" />
+          ) : (
+            body
+          )}
+        </ModalBody>
 
         {footer && (
-          <ModalFooter justifyContent={footerAlign}>{footer}</ModalFooter>
+          <ModalFooter
+            justifyContent={footerAlign}
+            position={stickyFooter ? "sticky" : "relative"}
+            bottom="0"
+            zIndex="10"
+            bg={modalBg}
+          >
+            {footer}
+          </ModalFooter>
         )}
       </ModalContent>
 
