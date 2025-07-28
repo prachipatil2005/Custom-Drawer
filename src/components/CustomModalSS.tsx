@@ -183,7 +183,7 @@ export default function CustomModal({
             to { right: 0; }
           }
           @keyframes slideOut {
-            from { right: 10; }
+            from { right: 0; }
             to { right: -${drawerWidth}; }
           }
         `}
