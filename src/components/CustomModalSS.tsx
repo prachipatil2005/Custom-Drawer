@@ -30,6 +30,8 @@ type CustomModalProps = {
   overlayBlur?: string;
   footerAlign?: "left" | "center" | "right";
   isResizable?: boolean;
+  hideOverlay?: boolean;
+  disableBodyScroll?: boolean;
 };
 
 export default function CustomModal({
@@ -49,6 +51,8 @@ export default function CustomModal({
   overlayBlur = "0px",
   footerAlign = "right",
   isResizable = false,
+  hideOverlay = false,
+  disableBodyScroll = false,
 }: CustomModalProps): JSX.Element {
   const overlayClickEnabled = isResizable ? false : closeOnOverlayClick;
 
@@ -56,6 +60,7 @@ export default function CustomModal({
   const initialWidth = width || "65vw";
   const [drawerWidth, setDrawerWidth] = useState(initialWidth);
   const modalBg = backgroundColor || useColorModeValue("white", "gray.700");
+  
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -67,6 +72,15 @@ export default function CustomModal({
       document.removeEventListener("keydown", handleEsc);
     };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+  if (disableBodyScroll && isOpen) {
+    document.body.style.overflow = "hidden";
+  }
+  return () => {
+    if (disableBodyScroll) document.body.style.overflow = "";
+  };
+}, [isOpen, disableBodyScroll]);
 
   // 🔧 Resizable drawer handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -122,10 +136,12 @@ export default function CustomModal({
       scrollBehavior={scrollBehavior}
       motionPreset="none"
     >
-      <ModalOverlay
-        bg="rgba(0, 0, 0, 0.4)"
-        backdropFilter={`blur(${overlayBlur})`}
-      />
+      {!hideOverlay && (
+        <ModalOverlay
+          bg="rgba(0, 0, 0, 0.4)"
+          backdropFilter={`blur(${overlayBlur})`}
+        />
+      )}
       <ModalContent
         position="fixed"
         right={isOpen ? "0" : `-${drawerWidth}`}

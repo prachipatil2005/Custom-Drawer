@@ -26,9 +26,10 @@ export default function ApprovalPage() {
         overlayBlur="4px"
         backgroundColor="white"
         padding="6"
-        
+        hideOverlay={true}
         footerAlign="center"
         isResizable={true}
+        maxW={maxWidth}
         // body={
         //   <div style={{ minHeight: '200px', padding: '20px' }}>
         //     <p>This is the modal content.</p>
